@@ -15,7 +15,7 @@ class SoundManager():
         self.outputDeviceName = outputDeviceName
         self.inputQ = queue.Queue()
         self.outputQ = queue.Queue(maxsize=2048)
-        self.samples = 12000
+        self.samples = 48000
         self.channels = 1
         self.mapping = [c-1 for c in [1]]
         self.inputStream = None
@@ -45,14 +45,14 @@ class SoundManager():
             outputData[:] = data
 
     def startRecord(self):
-        self.inputStream = sd.InputStream(channels=self.channels, samplerate=self.samples, device=self.inputDeviceName, dtype='int16', blocksize=240, callback=self.callbackInput, latency='high')
+        self.inputStream = sd.InputStream(channels=self.channels, samplerate=self.samples, device=self.inputDeviceName, dtype='int16', blocksize=960, callback=self.callbackInput, latency='high')
         self.inputStream.start()
 
     def stopRecord(self):
         self.inputStream.stop()
 
     def startPlay(self):
-        self.outputStream = sd.RawOutputStream(channels=self.channels, samplerate=self.samples, device=self.outputDeviceName, dtype='int16', blocksize=240, callback=self.callbackOutput)
+        self.outputStream = sd.RawOutputStream(channels=self.channels, samplerate=self.samples, device=self.outputDeviceName, dtype='int16', blocksize=960, callback=self.callbackOutput)
         self.outputStream.start()
 	
     def stopPlay(self):
