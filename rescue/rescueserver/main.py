@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import os
 import socketserver
+import subprocess
 import threading
 
 from rescue.common import message
@@ -8,10 +10,10 @@ from rescue.common.message_util import MessageUtil
 from rescue.common.message_header import Header
 from rescue.common.message_body import BodyCommonResponse, BodyEmpty
 from rescue.rescueserver.request_dialog import RequestDialog
-import vlc
 
 HOST = ''
 PORT = 9111
+GSTREAMER_PATH = 'D:\\gstreamer\\1.0\\x86_64\\bin\gst-launch-1.0'
 
 
 class RescuerManager:
@@ -117,7 +119,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
                 elif reqMsg.Header.MSGTYPE == message.REQ_VIDEO_STREAMING:
                     if not self.rm.getCallStatus():
                         self.rm.lockCall()
-                        requestDialog = RequestDialog("구조대원 4")
+                        requestDialog = RequestDialog("구조대원")
 
                         # ret == 0: 연결 수락 / ret == 1: 연결 거절
                         ret = requestDialog.showDialog()
@@ -132,14 +134,9 @@ class RequestHandler(socketserver.BaseRequestHandler):
                         if (ret == 0):
                             MessageUtil.send(client, rspMsg)
 
-                            # VLC 플레이어 실행
-                            instance = vlc.Instance()
-                            player = instance.media_player_new()
-                            media = instance.media_new('rtsp://141.223.84.113:9000/')
-                            media.get_mrl()
-                            player.set_media(media)
-                            player.play()
-                            print("abcd")
+                            # 플레이어 실행
+                            #os.system("D:\\gstreamer\\1.0\\x86_64\\bin\\gst-launch-1.0 -e -v udpsrc port=5000 ! application/x-rtp, payload=96 ! rtpjitterbuffer ! rtph264depay ! avdec_h264 ! fpsdisplaysink sync=false text-overlay=false")
+                            self.gstreamer = subprocess.Popen('D:\\gstreamer\\1.0\\x86_64\\bin\\gst-launch-1.0 -e -v udpsrc port=5000 ! application/x-rtp, payload=96 ! rtpjitterbuffer ! rtph264depay ! avdec_h264 ! fpsdisplaysink sync=false text-overlay=false', shell=True)
 
                         else:
                             rspMsg.Body.RESPONSE = message.DENIED
@@ -147,7 +144,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
 
                         self.rm.freeCall()
                     else:
-                        print("통화 거절")
+                        None
 
                     continue
 
@@ -164,6 +161,9 @@ class RequestHandler(socketserver.BaseRequestHandler):
 
                     MessageUtil.send(client, rspMsg)
 
+                    #self.gstreamer.kill()
+                    subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=self.gstreamer.pid))
+
                     print('통화종료 요청')
 
                     continue
@@ -171,6 +171,7 @@ class RequestHandler(socketserver.BaseRequestHandler):
                     None
         except Exception as err:
             print("Exception")
+            print(err);
             (hasToken, tokenLender) = self.rm.getTokenStatus()
 
             if not hasToken and tokenLender == self.client_address[0]:
