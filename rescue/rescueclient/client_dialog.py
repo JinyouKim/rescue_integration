@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import struct
 import sys
 import socketserver
 import socket
@@ -6,6 +7,7 @@ import threading
 import queue
 import PyQt5.QtCore
 import numpy as np
+import os, sys, errno
 
 from PyQt5.QtCore import QTimeLine
 from PyQt5.QtGui import QPainter, QPixmap, QImage
@@ -33,7 +35,6 @@ from rescue.common.message_body import BodyCommonResponse, BodyEmpty
 
 from picamera import PiCamera
 from picamera.array import PiRGBArray
-
 
 
 HOST = '192.0.1.10'
@@ -96,7 +97,6 @@ class CallSignal(QObject):
     acceptSignal = pyqtSignal()
     
     def emitCallSignal(self):
-        print('asdf')
         self.callSignal.emit()
 
     def emitAcceptSignal(self):
@@ -112,8 +112,6 @@ class ClientDialog():
         self.isClickedSignal = False
 
         self.multicastVs = VoiceStreaming(self.sm.myIp, self.sm.multicastPort, self.sm.multicastIp, self.sm.multicastPort)
-        self.ffmpegBridge = FfmpegBridge(sm)
-        self.ffmpegBridge.playAudioStream()
         self.callSignal = CallSignal()
         self.callSignal.callSignal.connect(self.call_handle)
         self.callSignal.acceptSignal.connect(self.accept_handle)
@@ -124,6 +122,19 @@ class ClientDialog():
         self.multicastRecvThread = threading.Thread(target = self.multicast_play_thread, args=("task",))
         self.multicastRecvThread.start()
         self.oc = OpusCodec()
+
+        # UWB Module included
+        self.isUwbModule = False;
+        uwbFilePath = '/home/monet/dw1000-positioning/tagRPi/fifofile'
+        try:
+            self.fifo = os.open(uwbFilePath, os.O_RDWR | os.O_NONBLOCK)
+            if self.fifo < 0 :
+                self.isUwbModule = False
+            else:
+                self.isUwbModule = True
+                threading.Thread(target = self.locationMark_handle).start()
+        except:
+            self.isUwbModule = False
 
         requestListener = ThreadedTCPServer((HOST, PORT), RequestHandler)
         threading.Thread(target=requestListener.serve_forever).start()
@@ -179,7 +190,7 @@ class ClientDialog():
 
     def streaming_handle(self, arg):
         self.stopCallThread = threading.Thread(target = self.stop_call_thread)
-        self.stopCallThread.start()
+        self.stopCallThr/home/monet/rescue_integration/rescue/rescueclient/client_dialog.pyead.start()
         self.callSignal.emitAcceptSignal()
         self.soundManager.startRecord()
         self.playThread = threading.Thread(target = self.play_thread, args = ("task",))
@@ -227,10 +238,9 @@ class ClientDialog():
     def video_streaming_thread(self, arg):
         q = queue.Queue()
         cm = CameraModule()
-        server = self.sm.serverIp
-        cm.startStreaming('192.168.0.110', 5000)
-        previewThread = threading.Thread(target = cm.startPreview, args = (q,))
-        previewThread.start()
+        cm.startStreaming(self.sm.serverIp, 5000)
+#        previewThread = threading.Thread(target = cm.startPreview, args = (q,))
+#        previewThread.start()
         t = threading.currentThread()
 
         while getattr(t, "do_run", True):
@@ -242,7 +252,7 @@ class ClientDialog():
                 self.ui.videoUi.frameLabel.setPixmap(pixmap)
 
         cm.stopStreaming()
-        previewThread.do_run = False
+#        previewThread.do_run = False
 
 
     def showDialog(self):
@@ -287,7 +297,7 @@ class ClientDialog():
 
 
     def clickedCameraButton(self):
-        self.ffmpegBridge.playButton()
+        print(self.sm.serverIp)
         choice = QMessageBox.question(self.dialog, "Video Streaming", "지휘PC로 영상을 전송 하시겠습니까?", QMessageBox.Yes | QMessageBox.No)
         isAccepted = False
         if choice == QMessageBox.Yes:            
@@ -313,7 +323,6 @@ class ClientDialog():
         # 요청 성공
         if isAccepted:
             self.isVoiceCalling = True
-            self.ffmpegBridge.playBeep()
             self.popupFrame = UiTranslucentWidget(self.dialog)
             self.popupFrame.move(0, 0)
             self.popupFrame.resize(self.dialog.width(), self.dialog.height())
@@ -339,7 +348,6 @@ class ClientDialog():
             self.multicastSendThread.do_run = False
 
     def clickedSignalButton(self):
-        self.ffmpegBridge.playButton()
         if not self.isClickedSignal:
 
             self.isClickedSignal = not self.isClickedSignal
@@ -358,7 +366,30 @@ class ClientDialog():
     def clickedFindRescuerButton(self):
         self.threadThrift.setSosFman(True)
 
+    def locationMark_handle(self):
+        x = -1.0
+        y = -1.0
+        t = threading.currentThread()
+        while getattr(t, "do_run", True):
+            try:
+                coordX = os.read(self.fifo, 8)
+                coordY = os.read(self.fifo, 8)
+            except OSError as err:
+                if err.errno == errno.EAGAIN or err.errno == errno.EWOULDBLOCK:
+                    coordX = None
+                    coordY = None
+                    continue
+                else:
+                    pass
 
+            if coordX is None and coordY is None:
+                pass
+            else:
+                x = struct.unpack('d', coordX)[0]
+                y = struct.unpack('d', coordY)[0]
+                self.threadThrift.setLocation(500.0, 100.0)
+        
+ 
     def mapImage_handle(self, iplImageData):        
         image = ImageConverter.IplImageDataToQImage(iplImageData.imageData, iplImageData.width, iplImageData.height, iplImageData.nChannels, iplImageData.widthStep, iplImageData.depth)
         pixmap = QPixmap.fromImage(image)
