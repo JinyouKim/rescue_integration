@@ -1,7 +1,7 @@
 import opuslib
 
 class OpusCodec:
-    def __init__(self, samples = 12000, frames = 240, channels = 1):
+    def __init__(self, samples = 48000, frames = 960, channels = 1):
         self.frames = frames
         self.encoder = opuslib.Encoder(samples, channels, opuslib.APPLICATION_VOIP)
         self.decoder = opuslib.Decoder(samples, channels)

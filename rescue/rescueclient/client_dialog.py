@@ -190,7 +190,7 @@ class ClientDialog():
 
     def streaming_handle(self, arg):
         self.stopCallThread = threading.Thread(target = self.stop_call_thread)
-        self.stopCallThr/home/monet/rescue_integration/rescue/rescueclient/client_dialog.pyead.start()
+        self.stopCallThread.start()
         self.callSignal.emitAcceptSignal()
         self.soundManager.startRecord()
         self.playThread = threading.Thread(target = self.play_thread, args = ("task",))
